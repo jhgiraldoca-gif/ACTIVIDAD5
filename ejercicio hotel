@@ -1,0 +1,69 @@
+import javax.swing.*;
+import java.awt.*;
+import java.text.*;
+import java.util.*;
+
+public class HotelApp extends JFrame {
+    private final Hotel hotel=new Hotel();
+    private final NumberFormat moneda=NumberFormat.getCurrencyInstance(new Locale("es","CO"));
+    private final SimpleDateFormat formatoFecha=new SimpleDateFormat("dd/MM/yyyy");
+
+    static class Huesped {
+        String nombre, apellidos, documento; Date fechaIngreso;
+        Huesped(String n,String a,String doc,Date ingreso){nombre=n;apellidos=a;documento=doc;fechaIngreso=ingreso;}
+    }
+    static class Habitacion {
+        int numero; double precioDia; Huesped huesped;
+        Habitacion(int n,double precio){numero=n;precioDia=precio;}
+        boolean disponible(){return huesped==null;}
+    }
+    static class Hotel {
+        final java.util.List<Habitacion> habitaciones=new ArrayList<>();
+        Hotel(){for(int i=1;i<=10;i++) habitaciones.add(new Habitacion(i,i<=5?120000:160000));}
+        Habitacion buscar(int numero){if(numero<1||numero>habitaciones.size())return null;return habitaciones.get(numero-1);}
+    }
+
+    public HotelApp(){
+        setTitle("Sistema de Gestión Hotelera");setSize(650,420);setLocationRelativeTo(null);setDefaultCloseOperation(EXIT_ON_CLOSE);setResizable(false);
+        JLabel titulo=new JLabel("GESTIÓN HOTELERA",SwingConstants.CENTER);titulo.setFont(new Font("Arial",Font.BOLD,26));titulo.setForeground(new Color(35,65,105));
+        JLabel descripcion=new JLabel("Control de habitaciones, ingreso y salida de huéspedes",SwingConstants.CENTER);
+        JPanel centro=new JPanel(new GridLayout(2,1,5,5));centro.add(titulo);centro.add(descripcion);add(centro,BorderLayout.CENTER);
+        JLabel pie=new JLabel("Hotel · 10 habitaciones simples",SwingConstants.CENTER);pie.setBorder(BorderFactory.createEmptyBorder(0,0,25,0));add(pie,BorderLayout.SOUTH);
+        JMenuBar barra=new JMenuBar();JMenu menu=new JMenu("Opciones");JMenuItem consultar=new JMenuItem("Consultar habitaciones");JMenuItem salida=new JMenuItem("Salida de huéspedes");
+        consultar.addActionListener(e->ventanaHabitaciones());salida.addActionListener(e->ventanaSalida());menu.add(consultar);menu.add(salida);barra.add(menu);setJMenuBar(barra);
+    }
+
+    private void ventanaHabitaciones(){
+        JDialog d=new JDialog(this,"Habitaciones del hotel",true);d.setSize(540,390);d.setLocationRelativeTo(this);
+        JPanel panel=new JPanel(new GridLayout(5,2,10,10));panel.setBorder(BorderFactory.createEmptyBorder(15,15,15,15));
+        for(Habitacion h:hotel.habitaciones){JButton b=new JButton("<html><center>Habitación "+h.numero+"<br>"+(h.disponible()?"Disponible":"No disponible")+"<br>"+moneda.format(h.precioDia)+" / día</center></html>");b.setFont(new Font("Arial",Font.PLAIN,13));b.setBackground(h.disponible()?new Color(220,242,225):new Color(245,220,220));b.setOpaque(true);b.addActionListener(e->{if(!h.disponible()){JOptionPane.showMessageDialog(d,"La habitación está ocupada.","No disponible",JOptionPane.ERROR_MESSAGE);return;}d.dispose();ventanaIngreso(h);});panel.add(b);}
+        d.add(panel);d.setVisible(true);
+    }
+
+    private void ventanaIngreso(Habitacion h){
+        JDialog d=new JDialog(this,"Ingreso del huésped - Habitación "+h.numero,true);d.setSize(420,330);d.setLocationRelativeTo(this);
+        JPanel p=new JPanel(new GridLayout(0,2,8,10));p.setBorder(BorderFactory.createEmptyBorder(18,18,18,18));
+        JTextField nombre=new JTextField(),apellidos=new JTextField(),documento=new JTextField(),fecha=new JTextField(formatoFecha.format(new Date()));
+        p.add(new JLabel("Nombre:"));p.add(nombre);p.add(new JLabel("Apellidos:"));p.add(apellidos);p.add(new JLabel("Documento:"));p.add(documento);p.add(new JLabel("Fecha de ingreso (dd/MM/yyyy):"));p.add(fecha);
+        JButton registrar=new JButton("Registrar ingreso"),cancelar=new JButton("Cancelar");p.add(registrar);p.add(cancelar);
+        registrar.addActionListener(e->{try{if(nombre.getText().isBlank()||apellidos.getText().isBlank()||documento.getText().isBlank())throw new IllegalArgumentException("Todos los campos son obligatorios.");Date f=formatoFecha.parse(fecha.getText().trim());if(f.after(new Date()))throw new IllegalArgumentException("La fecha de ingreso no puede ser futura.");h.huesped=new Huesped(nombre.getText().trim(),apellidos.getText().trim(),documento.getText().trim(),f);JOptionPane.showMessageDialog(d,"Huésped registrado correctamente.\nHabitación "+h.numero+" no disponible.");d.dispose();}
+            catch(ParseException ex){JOptionPane.showMessageDialog(d,"Use el formato de fecha dd/MM/yyyy.","Fecha incorrecta",JOptionPane.ERROR_MESSAGE);}catch(IllegalArgumentException ex){JOptionPane.showMessageDialog(d,ex.getMessage(),"Datos incorrectos",JOptionPane.ERROR_MESSAGE);}});
+        cancelar.addActionListener(e->d.dispose());d.add(p);d.setVisible(true);
+    }
+
+    private void ventanaSalida(){
+        String entrada=JOptionPane.showInputDialog(this,"Ingrese el número de habitación a entregar (1-10):","Salida de huéspedes",JOptionPane.QUESTION_MESSAGE);if(entrada==null)return;
+        try{int n=Integer.parseInt(entrada.trim());Habitacion h=hotel.buscar(n);if(h==null)throw new IllegalArgumentException("El número de habitación no es válido.");if(h.disponible())throw new IllegalArgumentException("La habitación no está ocupada.");mostrarSalida(h);}
+        catch(IllegalArgumentException ex){JOptionPane.showMessageDialog(this,ex.getMessage(),"Error",JOptionPane.ERROR_MESSAGE);}
+    }
+    private void mostrarSalida(Habitacion h){
+        JDialog d=new JDialog(this,"Salida - Habitación "+h.numero,true);d.setSize(440,300);d.setLocationRelativeTo(this);
+        JPanel p=new JPanel(new GridLayout(0,2,8,9));p.setBorder(BorderFactory.createEmptyBorder(18,18,18,18));
+        JTextField fecha=new JTextField(formatoFecha.format(new Date()));JLabel huesped=new JLabel(h.huesped.nombre+" "+h.huesped.apellidos);JLabel dias=new JLabel("Pendiente de calcular"),total=new JLabel("Pendiente de calcular");JButton calcular=new JButton("Calcular pago"),registrar=new JButton("Registrar salida");registrar.setEnabled(false);
+        p.add(new JLabel("Huésped:"));p.add(huesped);p.add(new JLabel("Fecha de salida (dd/MM/yyyy):"));p.add(fecha);p.add(new JLabel("Días de alojamiento:"));p.add(dias);p.add(new JLabel("Total a pagar:"));p.add(total);p.add(calcular);p.add(registrar);
+        final Date[] salida={null};
+        calcular.addActionListener(e->{try{Date f=formatoFecha.parse(fecha.getText().trim());if(!f.after(h.huesped.fechaIngreso))throw new IllegalArgumentException("La fecha de salida debe ser posterior al ingreso.");long diferencia=f.getTime()-h.huesped.fechaIngreso.getTime();int cantidad=(int)Math.max(1,(diferencia+86400000L-1)/86400000L);salida[0]=f;dias.setText(String.valueOf(cantidad));total.setText(moneda.format(cantidad*h.precioDia));registrar.setEnabled(true);}catch(ParseException ex){JOptionPane.showMessageDialog(d,"Use el formato dd/MM/yyyy.","Fecha incorrecta",JOptionPane.ERROR_MESSAGE);}catch(IllegalArgumentException ex){JOptionPane.showMessageDialog(d,ex.getMessage(),"Fecha incorrecta",JOptionPane.ERROR_MESSAGE);}});
+        registrar.addActionListener(e->{h.huesped=null;JOptionPane.showMessageDialog(d,"Salida registrada. La habitación "+h.numero+" está disponible.");d.dispose();});p.add(new JLabel(""));p.add(new JLabel(""));d.add(p);d.setVisible(true);
+    }
+    public static void main(String[] args){SwingUtilities.invokeLater(()->{HotelApp app=new HotelApp();app.setVisible(true);if(args.length>0 && args[0].equals("habitaciones"))app.ventanaHabitaciones();});}
+}
