@@ -1,0 +1,103 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.io.*;
+import java.text.NumberFormat;
+import java.util.*;
+
+public class Nomina extends JFrame {
+    private final ListaEmpleados lista = new ListaEmpleados();
+    private final NumberFormat moneda = NumberFormat.getCurrencyInstance(new Locale("es", "CO"));
+
+    static class Empleado {
+        String nombre, apellidos, cargo, genero;
+        double salarioDia, otrosIngresos, pagosSalud, aportePensiones;
+        int diasTrabajados;
+        Empleado(String nombre, String apellidos, String cargo, String genero, double salarioDia,
+                 int diasTrabajados, double otrosIngresos, double pagosSalud, double aportePensiones) {
+            this.nombre=nombre; this.apellidos=apellidos; this.cargo=cargo; this.genero=genero;
+            this.salarioDia=salarioDia; this.diasTrabajados=diasTrabajados;
+            this.otrosIngresos=otrosIngresos; this.pagosSalud=pagosSalud; this.aportePensiones=aportePensiones;
+        }
+        double calcularNomina() { return diasTrabajados*salarioDia + otrosIngresos - pagosSalud - aportePensiones; }
+    }
+
+    static class ListaEmpleados {
+        final java.util.List<Empleado> empleados = new ArrayList<>();
+        void agregar(Empleado e) { empleados.add(e); }
+        double calcularTotalNomina() { double total=0; for (Empleado e: empleados) total+=e.calcularNomina(); return total; }
+        String convertirTexto(NumberFormat formato) {
+            StringBuilder s=new StringBuilder("NÓMINA DE EMPLEADOS\n===================\n\n");
+            for (Empleado e: empleados) s.append("Nombre: ").append(e.nombre).append('\n')
+                .append("Apellidos: ").append(e.apellidos).append('\n').append("Cargo: ").append(e.cargo).append('\n')
+                .append("Género: ").append(e.genero).append('\n').append("Salario por día: ").append(formato.format(e.salarioDia)).append('\n')
+                .append("Días trabajados: ").append(e.diasTrabajados).append('\n').append("Otros ingresos: ").append(formato.format(e.otrosIngresos)).append('\n')
+                .append("Pagos por salud: ").append(formato.format(e.pagosSalud)).append('\n').append("Aporte pensiones: ").append(formato.format(e.aportePensiones)).append('\n')
+                .append("Salario mensual: ").append(formato.format(e.calcularNomina())).append("\n-------------------------\n");
+            return s.append("TOTAL NÓMINA: ").append(formato.format(calcularTotalNomina())).toString();
+        }
+    }
+
+    public Nomina() {
+        setTitle("Sistema de Nómina"); setSize(620,390); setLocationRelativeTo(null);
+        setDefaultCloseOperation(EXIT_ON_CLOSE); setResizable(false);
+        JLabel titulo=new JLabel("GESTIÓN DE NÓMINA",SwingConstants.CENTER);
+        titulo.setFont(new Font("Arial",Font.BOLD,25)); titulo.setForeground(new Color(35,65,105));
+        JLabel subtitulo=new JLabel("Registro y cálculo de salarios de empleados",SwingConstants.CENTER);
+        subtitulo.setFont(new Font("Arial",Font.PLAIN,14));
+        JPanel centro=new JPanel(new GridLayout(2,1,5,5)); centro.add(titulo); centro.add(subtitulo);
+        add(centro,BorderLayout.CENTER);
+        JLabel pie=new JLabel("Seleccione una opción del menú para comenzar",SwingConstants.CENTER);
+        pie.setBorder(BorderFactory.createEmptyBorder(0,0,25,0)); add(pie,BorderLayout.SOUTH);
+        JMenuBar barra=new JMenuBar(); JMenu menu=new JMenu("Nómina");
+        JMenuItem agregar=new JMenuItem("Agregar empleado"); JMenuItem calcular=new JMenuItem("Calcular nómina");
+        JMenuItem guardar=new JMenuItem("Guardar archivo");
+        agregar.addActionListener(e->ventanaAgregar()); calcular.addActionListener(e->ventanaCalcular()); guardar.addActionListener(e->guardarArchivo());
+        menu.add(agregar); menu.add(calcular); menu.addSeparator(); menu.add(guardar); barra.add(menu); setJMenuBar(barra);
+    }
+
+    private void ventanaAgregar() {
+        JDialog d=new JDialog(this,"Agregar empleado",true); d.setSize(440,510); d.setLocationRelativeTo(this);
+        JPanel p=new JPanel(new GridLayout(0,2,8,8)); p.setBorder(BorderFactory.createEmptyBorder(15,15,15,15));
+        JTextField nombre=new JTextField(), apellidos=new JTextField(), salario=new JTextField("50000"), otros=new JTextField("0"), salud=new JTextField("0"), pension=new JTextField("0");
+        JComboBox<String> cargo=new JComboBox<>(new String[]{"Directivo","Estratégico","Operativo"});
+        JRadioButton masculino=new JRadioButton("Masculino",true), femenino=new JRadioButton("Femenino"); ButtonGroup grupo=new ButtonGroup(); grupo.add(masculino); grupo.add(femenino);
+        JPanel generos=new JPanel(new FlowLayout(FlowLayout.LEFT)); generos.add(masculino); generos.add(femenino);
+        JSpinner dias=new JSpinner(new SpinnerNumberModel(30,1,31,1));
+        p.add(new JLabel("Nombre:")); p.add(nombre); p.add(new JLabel("Apellidos:")); p.add(apellidos);
+        p.add(new JLabel("Cargo:")); p.add(cargo); p.add(new JLabel("Género:")); p.add(generos);
+        p.add(new JLabel("Salario por día ($):")); p.add(salario); p.add(new JLabel("Días trabajados:")); p.add(dias);
+        p.add(new JLabel("Otros ingresos ($):")); p.add(otros); p.add(new JLabel("Pagos por salud ($):")); p.add(salud);
+        p.add(new JLabel("Aporte pensiones ($):")); p.add(pension);
+        JButton aceptar=new JButton("Agregar empleado"), cancelar=new JButton("Cancelar"); p.add(aceptar); p.add(cancelar);
+        aceptar.addActionListener(e->{
+            try {
+                if(nombre.getText().isBlank()||apellidos.getText().isBlank()) throw new IllegalArgumentException("Ingrese nombre y apellidos.");
+                double sd=Double.parseDouble(salario.getText()), oi=Double.parseDouble(otros.getText()), ps=Double.parseDouble(salud.getText()), ap=Double.parseDouble(pension.getText());
+                if(sd<0||oi<0||ps<0||ap<0) throw new IllegalArgumentException("Los valores no pueden ser negativos.");
+                lista.agregar(new Empleado(nombre.getText().trim(),apellidos.getText().trim(),(String)cargo.getSelectedItem(),masculino.isSelected()?"Masculino":"Femenino",sd,(Integer)dias.getValue(),oi,ps,ap));
+                JOptionPane.showMessageDialog(d,"Empleado agregado correctamente.","Registro exitoso",JOptionPane.INFORMATION_MESSAGE); d.dispose();
+            } catch(NumberFormatException ex){JOptionPane.showMessageDialog(d,"Ingrese valores numéricos válidos.","Dato incorrecto",JOptionPane.ERROR_MESSAGE);}
+              catch(IllegalArgumentException ex){JOptionPane.showMessageDialog(d,ex.getMessage(),"Dato incorrecto",JOptionPane.ERROR_MESSAGE);}
+        }); cancelar.addActionListener(e->d.dispose()); d.add(p); d.setVisible(true);
+    }
+
+    private void ventanaCalcular() {
+        String[] columnas={"Nombre","Apellidos","Sueldo mensual"}; DefaultTableModel modelo=new DefaultTableModel(columnas,0){public boolean isCellEditable(int r,int c){return false;}};
+        for(Empleado e:lista.empleados) modelo.addRow(new Object[]{e.nombre,e.apellidos,moneda.format(e.calcularNomina())});
+        JTable tabla=new JTable(modelo); tabla.setRowHeight(25); tabla.getTableHeader().setFont(new Font("Arial",Font.BOLD,13));
+        JLabel total=new JLabel("Total de la nómina: "+moneda.format(lista.calcularTotalNomina()),SwingConstants.RIGHT); total.setFont(new Font("Arial",Font.BOLD,16));
+        JPanel panel=new JPanel(new BorderLayout(10,10)); panel.setBorder(BorderFactory.createEmptyBorder(15,15,15,15)); panel.add(new JScrollPane(tabla),BorderLayout.CENTER); panel.add(total,BorderLayout.SOUTH);
+        JOptionPane.showMessageDialog(this,panel,"Cálculo de nómina",JOptionPane.PLAIN_MESSAGE);
+    }
+
+    private void guardarArchivo() {
+        JFileChooser selector=new JFileChooser(); selector.setDialogTitle("Seleccione dónde guardar Nómina.txt"); selector.setSelectedFile(new File("Nómina.txt"));
+        if(selector.showSaveDialog(this)==JFileChooser.APPROVE_OPTION) {
+            File destino=selector.getSelectedFile(); if(!destino.getName().toLowerCase().endsWith(".txt")) destino=new File(destino.getParentFile(),destino.getName()+".txt");
+            try(Writer w=new OutputStreamWriter(new FileOutputStream(destino),java.nio.charset.StandardCharsets.UTF_8)){w.write(lista.convertirTexto(moneda)); JOptionPane.showMessageDialog(this,"Archivo guardado correctamente.");}
+            catch(IOException ex){JOptionPane.showMessageDialog(this,"No fue posible guardar el archivo: "+ex.getMessage(),"Error",JOptionPane.ERROR_MESSAGE);}
+        }
+    }
+    public static void main(String[] args){SwingUtilities.invokeLater(()->{Nomina app=new Nomina();app.setVisible(true);if(args.length>0 && args[0].equals("agregar"))app.ventanaAgregar();});}
+}
